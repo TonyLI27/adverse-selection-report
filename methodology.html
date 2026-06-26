@@ -1,0 +1,149 @@
+<!doctype html><html><head><meta charset=utf-8><title>方法论</title><style>body{font-family:-apple-system,Segoe UI,Arial;margin:20px;max-width:1180px;color:#1a1a1a}
+h2{border-bottom:2px solid #ddd;margin-top:26px} h3{margin-top:22px;color:#234} h4{margin:10px 0 4px;color:#555}
+.meta{color:#666;font-size:12px;margin:6px 0}
+table.t{border-collapse:collapse;font-size:13px;margin:6px 0} table.t th,table.t td{border:1px solid #ccc;padding:4px 11px;text-align:right}
+table.t td.l,table.t th:first-child{text-align:left} table.t thead th{background:#eef}
+.box{background:#f7f7f9;border-left:4px solid #4a90d9;padding:10px 14px;margin:10px 0;font-size:13px}
+ol li{margin:5px 0;font-size:13px} code{background:#eee;padding:1px 4px}
+.md table{border-collapse:collapse;font-size:13px;margin:6px 0} .md th,.md td{border:1px solid #ccc;padding:4px 10px}
+.md h2{font-size:16px;border:0;margin-top:18px} .md h3{font-size:14px}
+.md blockquote{border-left:4px solid #4a90d9;margin:8px 0;padding:4px 12px;color:#444;background:#f7f7f9}
+.mermaid{background:#fafafe;border:1px solid #eee;padding:8px;margin:8px 0;text-align:center}</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded',function(){try{mermaid.initialize({startOnLoad:true});}catch(e){}});</script>
+</head><body><div class=md><h1>Nado 做市报价单测算方法论</h1>
+<blockquote>
+<p>以 Hyperliquid 为数据母体，把目标股票的做市参数映射到 Nado，估算每档每 $1 深度的月度亏损，从而反推出报价单。</p>
+</blockquote>
+<hr />
+<h2>一、要回答的问题</h2>
+<p>Nado 想请我们把一批股票搬到它的平台上做市，并按「每票每月约 1w」的预算补贴我们。我们要提一张报价单，核心问题是：</p>
+<blockquote>
+<p>在这笔补贴下，每只票在 <strong>10 / 20 / 50 / 75 / 100 bps</strong> 各档上，能<strong>持续</strong>提供多少深度？</p>
+</blockquote>
+<p>要回答它，本质上要先算出一个单位经济：</p>
+<blockquote>
+<p>某只票、某一档，每提供 <strong>$1 深度</strong>、每月预期<strong>亏多少钱</strong>。</p>
+</blockquote>
+<p>有了这个「每 $1 深度月亏损率」，再用预算反推可承受的深度，报价单就出来了。</p>
+<p>难点在于：<strong>Nado 上数据太稀疏，部分票（如 Zhipu、Minimax）甚至从来没在 Nado 上交易过</strong>。所以不能直接用 Nado 的历史数据估算，而要从数据丰富的 Hyperliquid 上<strong>映射</strong>过来。</p>
+<hr />
+<h2>二、整体流程</h2>
+<div class="mermaid">flowchart TD
+    A[Hyperliquid 数据母体<br/>数据丰富、覆盖广] --> B[校准 Nado ↔ HL 映射<br/>量 β≈0.4% · AVoC 直接继承]
+    B --> C[A 类：HL 上有此票<br/>交易量 ×0.4% · AVoC 继承]
+    B --> D[B 类：HL 上也没有<br/>选 3 只代理票求平均]
+    C --> E[每票 × 每档：原始量<br/>交易量 · 交易次数 · AVoC 日/夜盘]
+    D --> E
+    E --> F[每 $1 深度月盈亏<br/>= m × s/2 − AVoC]
+    F --> G[预算反推报价单<br/>Σ 各档深度 × 亏损率 ≤ 预算]</div>
+<p>文字版流程：<strong>Hyperliquid 数据 → 校准映射 → 按数据可得性分类我们的票 → 得到每票每档原始量 → 算每 $1 深度月盈亏 → 用预算反推报价单</strong>。</p>
+<hr />
+<h2>三、做市盈亏的基本框架（为什么会亏、亏在哪）</h2>
+<p>在某一档价差 <code>s</code> 上挂 $1 深度，每被成交一单位，盈亏由两部分组成：</p>
+<ul>
+<li><strong>赚</strong>：吃到半价差 ≈ <code>s / 2</code></li>
+<li><strong>亏</strong>：逆向选择成本 <strong>AVoC</strong>——被知情单打穿后价格朝不利方向移动的成本，即这一档流量的「毒性」</li>
+</ul>
+<p>所以单位成交净盈亏为：</p>
+<pre><code>单位净盈亏 = s/2 − AVoC
+</code></pre>
+<p>在 10 / 20 bps 这种窄档、或波动大的票上，往往 <code>AVoC &gt; s/2</code>，单位成交即净亏——这正是需要 Nado 补贴的部分。</p>
+<p>把它月度化，每只票、每一档（且区分<strong>日盘 / 夜盘</strong>，两段毒性与量都不同）需要三个原始量：</p>
+<table>
+<thead>
+<tr>
+<th>原始量</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>交易量 Trading volume</td>
+<td>这一档能吃到多少流量</td>
+</tr>
+<tr>
+<td>交易次数</td>
+<td>成交频率 / 换手快慢</td>
+</tr>
+<tr>
+<td>逆向选择成本 AVoC</td>
+<td>这一档的毒性</td>
+</tr>
+</tbody>
+</table>
+<p>合起来：</p>
+<pre><code>每 $1 深度月盈亏 ≈ m × ( s/2 − AVoC )
+</code></pre>
+<p>其中 <code>m</code> = 这 $1 深度的月度预期成交量（由市场流量与你在该档队列中的占比推得）。为负即为该档的<strong>每 $1 深度月亏损率</strong> <code>L(票, 档)</code>，这就是报价单要用的单元数字。</p>
+<hr />
+<h2>四、第一步：用两边都有的票校准映射</h2>
+<p>取两个交易所都有的票（SpaceX、Google、Apple…）作为校准样本。对每只票分别算出两边的<strong>日盘 &amp; 夜盘 trading volume</strong> 和<strong>每档 AVoC</strong>，拟线性模型 <code>Nado = β × Hyperliquid</code>：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>处理方式</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>交易量</td>
+<td>线性回归可估</td>
+<td><strong>β ≈ 0.4%</strong>（Nado 量约为 HL 同票的 0.4%）</td>
+</tr>
+<tr>
+<td>AVoC</td>
+<td>两边差异 / 方差太大，线性拟合不可靠</td>
+<td><strong>不估系数，直接令 Nado 每档 AVoC = HL 每档 AVoC</strong>（假设同档毒性一致）</td>
+</tr>
+</tbody>
+</table>
+<p>这一步的产出，是一套可套用到任意票上的「搬运规则」：<strong>量打 0.4 折，毒性原样继承</strong>。</p>
+<hr />
+<h2>五、第二步：按数据可得性分类处理「我们的票」</h2>
+<h3>A 类 —— Hyperliquid 上有该票（如 Zhipu、Minimax）</h3>
+<ul>
+<li><strong>交易量</strong>：用 HL 的量 × 0.4% 线性映射到 Nado</li>
+<li><strong>AVoC</strong>：直接继承 HL 的每档 AVoC</li>
+</ul>
+<h3>B 类 —— Hyperliquid 上也没有（如 腾讯、小米）</h3>
+<ol>
+<li>先选 <strong>3 只 HL 上「同行业、相近波动率」</strong>的代理票</li>
+<li>对这 3 只的 HL 交易量与每档 AVoC 做 <strong>simple average</strong>，拼出该票的「Hyperliquid 等效画像」</li>
+<li>再套<strong>同一套映射</strong>（量 ×0.4%、AVoC 直接继承）落到 Nado</li>
+</ol>
+<p>这样无论票在 Nado 上有没有数据，都能得到一组<strong>统一口径</strong>的参数。</p>
+<hr />
+<h2>六、第三步：算出每票每档的单位经济</h2>
+<p>对每只票 × 每档 × 日 / 夜盘，用映射来的 <code>{交易量, 交易次数, AVoC}</code> 代入：</p>
+<pre><code>每 $1 深度月盈亏 = m × ( s/2 − AVoC )
+</code></pre>
+<p>得到每票每档的「每 $1 深度月亏损率」 <code>L(票, 档)</code>。一般规律：</p>
+<ul>
+<li><strong>窄档（10 / 20 bps）</strong>：<code>L</code> 大、亏得多</li>
+<li><strong>宽档（75 / 100 bps）</strong>：<code>L</code> 小，甚至转正</li>
+</ul>
+<blockquote>
+<p><strong>需要明确的假设</strong>：<code>m</code>（这 $1 深度的月度成交量）取决于你在该档队列里的占比 / 参与率。建议先固定一个保守的参与率假设（例如假设吃到该档流量的某个固定比例），后续再用 Nado 实盘数据回填校准。</p>
+</blockquote>
+<hr />
+<h2>七、第四步：用预算反推报价单</h2>
+<p>给定预算 <code>B</code>（如 $10k / 票 / 月），在各档之间分配深度 <code>D(档)</code>，使每票的<strong>总预期净亏损不超过预算</strong>：</p>
+<pre><code>Σ_档  D(档) × L(票, 档)  ≤  B
+</code></pre>
+<p>由于窄档烧钱快、宽档省钱甚至贴补，可据此在各档间做分配，反解出<strong>每档可持续提供的深度</strong>——这组深度就是报价单。</p>
+<hr />
+<h2>八、一句话总结</h2>
+<blockquote>
+<p>以 Hyperliquid 为数据母体，用两边共有票校准出「量打 0.4 折、毒性原样继承」的映射；按数据可得性把目标票分成 A 类（直接映射）与 B 类（代理篮子求平均后映射）；由此得到每票每档的 <code>{量, 次数, AVoC}</code>，算出每 $1 深度的月亏损率；最后用 Nado 的补贴预算反推各档可持续深度，形成报价单。</p>
+</blockquote>
+<hr />
+<h2>附：待收紧的假设（可按需在方法论里写死）</h2>
+<ul>
+<li><code>m</code> 的参与率 / 队列占比假设</li>
+<li>日盘与夜盘是否分别报价</li>
+<li>B 类代理票「相近波动率」的筛选阈值</li>
+<li>窄档亏损是否用宽档盈余做内部对冲</li>
+</ul></div></body></html>

@@ -18,17 +18,19 @@ iframe{width:100%;height:calc(100vh - 118px);border:0;display:block}
  <div class="sub">Hyperliquid HIP-3 · Nado stock perps · markout / adverse-selection / 20min hedge</div>
 </header>
 <div class="tabs">
- <button id="b1" class="on" onclick="show('phase2_dynamic.html',this)">① 逐档 markout 逆向选择 (交互)</button>
- <button id="b2" onclick="show('nado_hedge.html',this)">② 照单全收：Nado vs Hyperliquid · 对冲 vs 无对冲</button>
- <button id="b3" onclick="show('quote.html',this)">③ Nado 做市报价单（智谱/MiniMax/腾讯/小米）</button>
+ <button id="b0" class="on" onclick="show('methodology.html',this)">① 方法论</button>
+ <button id="b1" onclick="show('phase2_dynamic.html',this)">② 逐档 markout 逆向选择 (交互)</button>
+ <button id="b2" onclick="show('nado_hedge.html',this)">③ 照单全收：Nado vs Hyperliquid · 对冲 vs 无对冲</button>
+ <button id="b3" onclick="show('quote.html',this)">④ Nado 做市报价单</button>
 </div>
-<div class="note" id="note"><b>①</b> 选股票 / 档位(5–300bps) / x范围；逐秒 markout 曲线 + 首次归零★ + 固定20min的逐档 AS / 日均成交量 / 月度亏损 bar。<b>首次加载约 46MB，请稍候几秒。</b></div>
-<iframe id="frame" src="phase2_dynamic.html" title="report"></iframe>
+<div class="note" id="note"><b>①</b> 方法论：以 Hyperliquid 为数据母体，校准 Nado↔HL 映射，估算每档每 $1 深度的月亏损率，反推报价单。</div>
+<iframe id="frame" src="methodology.html" title="report"></iframe>
 <script>
 var NOTES={
- 'phase2_dynamic.html':'<b>①</b> 选股票 / 档位(5–300bps) / x范围；逐秒 markout 曲线 + 首次归零★ + 固定20min的逐档 AS / 日均成交量 / 月度亏损 bar。<b>首次加载约 46MB，请稍候几秒。</b>',
- 'nado_hedge.html':'<b>②</b> 吃下全部 taker 流的做市 P&amp;L：Nado(HIP-3对冲) 与 Hyperliquid(self-flatten)，每个含对冲/无对冲。Plotly 图例可点击只看 hedge 或 no-hedge。',
- 'quote.html':'<b>③</b> 报价单：用 HL→Nado 线性映射(β_vol=0.4%, β_avoc=1.0) 估算 4 只标的在各档的承诺中位深度（每票 $10k/月），日盘/夜盘分开，附做市商保护条款。'};
+ 'methodology.html':'<b>①</b> 方法论：以 Hyperliquid 为数据母体，校准 Nado↔HL 映射（量×0.4%、毒性继承），按数据可得性分类目标票，算每 $1 深度月亏损率，反推报价单。',
+ 'phase2_dynamic.html':'<b>②</b> 选股票 / 档位(5–300bps) / x范围；逐秒 markout 曲线 + 首次归零★ + 固定20min的逐档 AS / 日均成交量 / 月度亏损 bar。<b>首次加载约 46MB，请稍候几秒。</b>',
+ 'nado_hedge.html':'<b>③</b> 吃下全部 taker 流的做市 P&amp;L：Nado(HIP-3对冲) 与 Hyperliquid(self-flatten)，每个含对冲/无对冲。Plotly 图例可点击只看 hedge 或 no-hedge。',
+ 'quote.html':'<b>④</b> 报价单：final cost=20min逆选+对冲成本；累计深度 cap 在 HL ZHIPU；每票给 1w/5w/10w 三档月费的逐层深度。'};
 function show(u,btn){document.getElementById('frame').src=u;
  document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('on')});btn.classList.add('on');
  document.getElementById('note').innerHTML=NOTES[u];}
