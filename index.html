@@ -1,0 +1,34 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adverse Selection & Market-Making Research</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#1a1a1a}
+header{padding:14px 22px;background:#1a1f2e;color:#fff}
+header h1{margin:0;font-size:18px} header .sub{font-size:12px;color:#9fb0c8;margin-top:3px}
+.tabs{display:flex;background:#2b3245;flex-wrap:wrap}
+.tabs button{padding:11px 20px;background:transparent;color:#c7d0e0;border:0;border-bottom:3px solid transparent;cursor:pointer;font-size:14px}
+.tabs button:hover{color:#fff}
+.tabs button.on{color:#fff;border-bottom-color:#4a90d9;font-weight:600;background:#222838}
+.note{padding:8px 22px;background:#f4f6fb;font-size:12px;color:#566;border-bottom:1px solid #e3e7ef}
+iframe{width:100%;height:calc(100vh - 118px);border:0;display:block}
+.note b{color:#234}
+</style></head><body>
+<header>
+ <h1>逐档逆向选择 &amp; 照单全收做市 P&amp;L — 研究报告</h1>
+ <div class="sub">Hyperliquid HIP-3 · Nado stock perps · markout / adverse-selection / 20min hedge</div>
+</header>
+<div class="tabs">
+ <button id="b1" class="on" onclick="show('phase2_dynamic.html',this)">① 逐档 markout 逆向选择 (交互)</button>
+ <button id="b2" onclick="show('nado_hedge.html',this)">② 照单全收：Nado vs Hyperliquid · 对冲 vs 无对冲</button>
+</div>
+<div class="note" id="note"><b>①</b> 选股票 / 档位(5–300bps) / x范围；逐秒 markout 曲线 + 首次归零★ + 固定20min的逐档 AS / 日均成交量 / 月度亏损 bar。<b>首次加载约 46MB，请稍候几秒。</b></div>
+<iframe id="frame" src="phase2_dynamic.html" title="report"></iframe>
+<script>
+var NOTES={
+ 'phase2_dynamic.html':'<b>①</b> 选股票 / 档位(5–300bps) / x范围；逐秒 markout 曲线 + 首次归零★ + 固定20min的逐档 AS / 日均成交量 / 月度亏损 bar。<b>首次加载约 46MB，请稍候几秒。</b>',
+ 'nado_hedge.html':'<b>②</b> 吃下全部 taker 流的做市 P&amp;L：Nado(HIP-3对冲) 与 Hyperliquid(self-flatten)，每个含对冲/无对冲。Plotly 图例可点击只看 hedge 或 no-hedge。'};
+function show(u,btn){document.getElementById('frame').src=u;
+ document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('on')});btn.classList.add('on');
+ document.getElementById('note').innerHTML=NOTES[u];}
+</script>
+</body></html>
